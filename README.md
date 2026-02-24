@@ -1,97 +1,46 @@
-# Google Chat bot server with password authentication
+# NetFree YouTube Status Manager (Client-Only)
 
-שרת Flask לבוט Google Chat שדורש סיסמה לפני שימוש.
+A fully client-side Next.js application for scanning a search term and analyzing simulated NetFree status predictions without a backend or database.
 
-## איך זה עובד (עם הקליינט הרגיל של Google Chat)
+## Features
 
-1. המשתמש כותב לבוט מתוך הקליינט הרגיל של Google Chat.
-2. המשתמש שולח הודעה `/login <password>`.
-3. אם הסיסמה נכונה נוצרת לו session זמני בזיכרון.
-4. כל הודעה אחרת נבדקת מול ה-session:
-   - אם המשתמש לא מחובר → הבוט מחזיר בקשה להתחברות.
-   - אם מחובר → הבוט מטפל בהודעה.
+- Term-based fresh scan (`Scan & Analyze`) on each run.
+- Video metadata + NetFree status tracking.
+- Global search, filter by status/channel, and sort by:
+  - approval probability
+  - channel approval rate
+- Actions:
+  - Check Status
+  - Send Open Request
+  - Recalculate Probability
+- Video details page.
+- Admin analytics page with:
+  - Approval rate by channel
+  - Approval rate by category
+  - Trends/efficiency snapshot
+- Toast notifications, loading states, and confirmation modal.
 
-השרת תומך גם ב-`message.text` (הודעות רגילות מהקליינט) וגם ב-`message.argumentText` (slash commands), ומנקה mention tokens של Google Chat כדי שהפקודה `/login` תעבוד עקבי.
+> This system does **not** bypass or interfere with NetFree filtering. It only supports tracking and decision planning.
 
-> ⚠️ בגרסה הזאת ה-session נשמר בזיכרון (RAM), ולכן מתאים לפיתוח/POC.
-> לפרודקשן עדיף Redis או DB + אימות חתימה של Google Chat requests.
-
-## Local development
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-export CHAT_PASSWORD='my-secret-password'
-export SESSION_TTL_MINUTES='30'
-python app.py
-```
-
-השרת יאזין ב-`http://0.0.0.0:8080`.
-
-## Deploy (Docker / Cloud Run)
-
-### 1) Build image locally
+## Run
 
 ```bash
-docker build -t gchat-password-bot .
+npm install
+npm run dev
 ```
 
-### 2) Run container locally
+Then open `http://localhost:3000`.
 
-```bash
-docker run --rm -p 8080:8080 \
-  -e CHAT_PASSWORD='my-secret-password' \
-  -e SESSION_TTL_MINUTES='30' \
-  gchat-password-bot
-```
+## Architecture
 
-### 3) Deploy to Google Cloud Run
+- `app/page.tsx`: main client dashboard and scan trigger.
+- `components/VideoTable.tsx`: filters, sorting, actions, table UI.
+- `services/mockScanner.ts`: term scanning and metadata generation.
+- `services/approvalEngine.ts`: rule-based probability scoring.
+- `app/admin/page.tsx`: client-side analytics panel.
+- `app/videos/[id]/page.tsx`: client-side video detail page.
 
-```bash
-PROJECT_ID="your-project-id"
-REGION="us-central1"
-SERVICE="gchat-password-bot"
+## Notes
 
-# Build + push באמצעות Cloud Build
-gcloud builds submit --tag gcr.io/$PROJECT_ID/$SERVICE
-
-# Deploy
-gcloud run deploy $SERVICE \
-  --image gcr.io/$PROJECT_ID/$SERVICE \
-  --platform managed \
-  --region $REGION \
-  --allow-unauthenticated \
-  --set-env-vars CHAT_PASSWORD='my-secret-password',SESSION_TTL_MINUTES='30'
-```
-
-לאחר ה-deploy קבל URL ציבורי והגדר אותו ב-Google Chat בתור HTTP endpoint ל-`/chat`.
-
-## בדיקה מקומית עם curl (פורמט הודעה רגיל של Google Chat)
-
-```bash
-# 1) בלי login
-curl -s -X POST http://localhost:8080/chat \
-  -H 'content-type: application/json' \
-  -d '{"user":{"name":"users/123"},"message":{"text":"hello"}}'
-
-# 2) login עם סיסמה נכונה
-curl -s -X POST http://localhost:8080/chat \
-  -H 'content-type: application/json' \
-  -d '{"user":{"name":"users/123"},"message":{"text":"/login my-secret-password"}}'
-
-# 3) הודעה אחרי login
-curl -s -X POST http://localhost:8080/chat \
-  -H 'content-type: application/json' \
-  -d '{"user":{"name":"users/123"},"message":{"text":"שלום"}}'
-```
-
-## חיבור ל-Google Chat
-
-ב-Google Cloud Console:
-
-1. צור Google Chat API app.
-2. הגדר **Connection settings** כ-HTTP endpoint אל `/chat`.
-3. ודא שהמשתמשים מתקשרים דרך הקליינט הרגיל של Google Chat (DM או הודעה במרחב שבו הבוט קיים).
-4. מומלץ להוסיף אימות request authenticity (JWT / verification) לפני פרודקשן.
+- Persistence is browser `localStorage` only (latest scan session).
+- No API routes, auth server, Prisma, or PostgreSQL are required.
